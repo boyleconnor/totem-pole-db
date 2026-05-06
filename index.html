@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seattle Totem Pole Database</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f0;
+            color: #2c2c2c;
+            line-height: 1.6;
+        }
+        header {
+            background: #1a3a2a;
+            color: #e8e4d8;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+        header h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+        header p { opacity: 0.8; font-size: 0.95rem; }
+        .controls {
+            max-width: 1100px;
+            margin: 1.5rem auto;
+            padding: 0 1rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .controls input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.6rem 1rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        .controls select {
+            padding: 0.6rem 1rem;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            background: white;
+        }
+        .count {
+            font-size: 0.85rem;
+            color: #666;
+            width: 100%;
+        }
+        .loading {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #666;
+            font-size: 1.1rem;
+        }
+        .error {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: #c0392b;
+        }
+        .grid {
+            max-width: 1100px;
+            margin: 0 auto 3rem;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.2rem;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-left: 4px solid #2d6a4f;
+        }
+        .card h2 {
+            font-size: 1.15rem;
+            margin-bottom: 0.5rem;
+            color: #1a3a2a;
+        }
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1.5rem;
+            margin-bottom: 0.8rem;
+            font-size: 0.85rem;
+            color: #555;
+        }
+        .card-meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
+        .card-meta .label { font-weight: 600; color: #333; }
+        .badge {
+            display: inline-block;
+            background: #d4edda;
+            color: #1a5928;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .badge.non-indigenous {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .section { margin-top: 0.8rem; }
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #888;
+            margin-bottom: 0.3rem;
+        }
+        .section-content {
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            color: #444;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .links a {
+            color: #2d6a4f;
+            text-decoration: none;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+        .links a:hover { text-decoration: underline; }
+        .map-link {
+            display: inline-block;
+            margin-top: 0.4rem;
+            padding: 0.3rem 0.7rem;
+            background: #e8f5e9;
+            border-radius: 4px;
+            color: #2d6a4f;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .map-link:hover { background: #c8e6c9; }
+        footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            font-size: 0.8rem;
+            color: #888;
+        }
+        footer a { color: #2d6a4f; }
+        @media (min-width: 700px) {
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Seattle Totem Pole Database</h1>
+        <p>A catalog of totem poles and carved poles in the Seattle area</p>
+    </header>
+    <div class="controls">
+        <input type="text" id="search" placeholder="Search by name, artist, affiliation...">
+        <select id="filter-affiliation">
+            <option value="">All affiliations</option>
+        </select>
+        <div class="count" id="count"></div>
+    </div>
+    <div id="loading" class="loading">Loading data from Google Sheets...</div>
+    <div class="grid" id="grid"></div>
+    <footer>
+        Data sourced from <a href="https://docs.google.com/spreadsheets/d/18dIGNWnrkRBldfRiPxQqi38WmKZocmh4bTDIcN43C7s/edit?usp=sharing">Google Sheets</a>
+    </footer>
+
+<script>
+const SHEET_ID = '18dIGNWnrkRBldfRiPxQqi38WmKZocmh4bTDIcN43C7s';
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+
+let DATA = [];
+
+// Simple CSV parser that handles quoted fields with newlines and escaped quotes
+function parseCSV(text) {
+    const rows = [];
+    let i = 0;
+    while (i < text.length) {
+        const row = [];
+        while (i < text.length) {
+            if (text[i] === '"') {
+                // Quoted field
+                i++;
+                let field = '';
+                while (i < text.length) {
+                    if (text[i] === '"') {
+                        if (i + 1 < text.length && text[i + 1] === '"') {
+                            field += '"';
+                            i += 2;
+                        } else {
+                            i++; // closing quote
+                            break;
+                        }
+                    } else {
+                        field += text[i];
+                        i++;
+                    }
+                }
+                row.push(field);
+                // Skip comma or newline
+                if (i < text.length && text[i] === ',') i++;
+                else if (i < text.length && (text[i] === '\r' || text[i] === '\n')) {
+                    if (text[i] === '\r' && i + 1 < text.length && text[i + 1] === '\n') i += 2;
+                    else i++;
+                    break;
+                }
+            } else {
+                // Unquoted field
+                let field = '';
+                while (i < text.length && text[i] !== ',' && text[i] !== '\r' && text[i] !== '\n') {
+                    field += text[i];
+                    i++;
+                }
+                row.push(field);
+                if (i < text.length && text[i] === ',') i++;
+                else if (i < text.length && (text[i] === '\r' || text[i] === '\n')) {
+                    if (text[i] === '\r' && i + 1 < text.length && text[i + 1] === '\n') i += 2;
+                    else i++;
+                    break;
+                }
+            }
+        }
+        if (row.length > 0 && !(row.length === 1 && row[0] === '')) {
+            rows.push(row);
+        }
+    }
+    return rows;
+}
+
+function csvToObjects(rows) {
+    const headers = rows[0];
+    return rows.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = row[i] || ''; });
+        return obj;
+    });
+}
+
+function normalizeData(raw) {
+    return raw.map(r => ({
+        name: r['Location Name'] || '',
+        location: r['Location'] || '',
+        plaque: r['Plaque Transcription'] || '',
+        year: r['Year carved'] || '',
+        artists: (r['Artist(s)'] || '').replace(/\n/g, ', '),
+        affiliation: (r['Artist Affiliation'] || '').replace(/\n/g, ', '),
+        notes: r['Notes'] || ''
+    }));
+}
+
+function extractLinks(text) {
+    const urlRegex = /https?:\/\/[^\s"<>)]+/g;
+    return text ? (text.match(urlRegex) || []) : [];
+}
+
+function escapeHtml(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function buildAffiliationFilter() {
+    const affiliations = new Set();
+    DATA.forEach(d => {
+        if (d.affiliation) {
+            d.affiliation.split(',').forEach(a => {
+                const trimmed = a.trim().replace(/\s*\(.*?\)\s*/g, '');
+                if (trimmed) affiliations.add(trimmed);
+            });
+        }
+    });
+    const select = document.getElementById('filter-affiliation');
+    [...affiliations].sort().forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a; opt.textContent = a;
+        select.appendChild(opt);
+    });
+}
+
+function renderCard(item) {
+    const links = [...extractLinks(item.notes), ...extractLinks(item.plaque)];
+    const uniqueLinks = [...new Set(links)];
+    const affiliationBadges = item.affiliation
+        ? item.affiliation.split(',').map(a => {
+            const t = a.trim();
+            if (!t) return '';
+            const cls = t.toLowerCase().includes('non-indigenous') ? 'badge non-indigenous' : 'badge';
+            return `<span class="${cls}">${escapeHtml(t)}</span>`;
+        }).join(' ')
+        : '';
+
+    let html = `<div class="card">
+        <h2>${escapeHtml(item.name)}</h2>
+        <div class="card-meta">`;
+    if (item.year) html += `<span><span class="label">Year:</span> ${escapeHtml(item.year)}</span>`;
+    if (item.artists) html += `<span><span class="label">Artist(s):</span> ${escapeHtml(item.artists)}</span>`;
+    html += `</div>`;
+    if (affiliationBadges) html += `<div style="margin-bottom:0.6rem">${affiliationBadges}</div>`;
+    if (item.plaque) {
+        const plaqueText = item.plaque.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
+        if (plaqueText) {
+            html += `<div class="section">
+                <div class="section-title">Plaque Transcription</div>
+                <div class="section-content">${escapeHtml(plaqueText)}</div>
+            </div>`;
+        }
+    }
+    if (item.notes) {
+        const notesClean = item.notes.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
+        if (notesClean) {
+            html += `<div class="section">
+                <div class="section-title">Notes</div>
+                <div class="section-content">${escapeHtml(notesClean)}</div>
+            </div>`;
+        }
+    }
+    if (uniqueLinks.length > 0) {
+        html += `<div class="section links"><div class="section-title">References</div>`;
+        uniqueLinks.forEach(l => { html += `<a href="${encodeURI(l)}" target="_blank" rel="noopener">${escapeHtml(l)}</a><br>`; });
+        html += `</div>`;
+    }
+    if (item.location) {
+        html += `<a class="map-link" href="${encodeURI(item.location)}" target="_blank" rel="noopener">View on Map</a>`;
+    }
+    html += `</div>`;
+    return html;
+}
+
+function render() {
+    const query = document.getElementById('search').value.toLowerCase();
+    const affFilter = document.getElementById('filter-affiliation').value.toLowerCase();
+    const filtered = DATA.filter(item => {
+        const text = `${item.name} ${item.artists} ${item.affiliation} ${item.notes} ${item.plaque}`.toLowerCase();
+        if (query && !text.includes(query)) return false;
+        if (affFilter && !item.affiliation.toLowerCase().includes(affFilter)) return false;
+        return true;
+    });
+    document.getElementById('count').textContent = `Showing ${filtered.length} of ${DATA.length} entries`;
+    document.getElementById('grid').innerHTML = filtered.map(renderCard).join('');
+}
+
+async function init() {
+    try {
+        const response = await fetch(CSV_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        const rows = parseCSV(text);
+        const raw = csvToObjects(rows);
+        DATA = normalizeData(raw);
+
+        document.getElementById('loading').style.display = 'none';
+        buildAffiliationFilter();
+        render();
+
+        document.getElementById('search').addEventListener('input', render);
+        document.getElementById('filter-affiliation').addEventListener('change', render);
+    } catch (err) {
+        document.getElementById('loading').innerHTML =
+            `<div class="error">Failed to load data: ${escapeHtml(err.message)}<br>Make sure the spreadsheet is publicly shared.</div>`;
+    }
+}
+
+init();
+</script>
+</body>
+</html>
