@@ -94,6 +94,18 @@
             background: #fff3cd;
             color: #856404;
         }
+        .badge.status-removed {
+            background: #f1d6d6;
+            color: #7a2222;
+        }
+        .card-title {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .card-title h2 { margin: 0; }
         .fields {
             width: 100%;
             border-collapse: collapse;
@@ -359,6 +371,7 @@ function normalizeData(raw) {
         artists: (r.artists || '').replace(/\n/g, ', '),
         affiliation: (r.affiliation || '').replace(/\n/g, ', '),
         notes: r.notes || '',
+        status: (r.status || '').trim().toLowerCase(),
         references: parseReferences(r.references),
         images: r.images
             ? r.images.split('|').filter(Boolean).map(src => ({ kind: imageKindFromPath(src), src }))
@@ -453,8 +466,11 @@ function renderCard(item) {
         `<tr><th>${label}</th><td>${value}</td></tr>`
     ).join('');
 
+    const statusBadge = item.status
+        ? `<span class="badge status-${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>`
+        : '';
     return `<div class="card">
-        <h2>${escapeHtml(item.name)}</h2>
+        <div class="card-title"><h2>${escapeHtml(item.name)}</h2>${statusBadge}</div>
         ${gallery}
         <table class="fields"><tbody>${tableRows}</tbody></table>
     </div>`;
