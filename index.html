@@ -4,12 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seattle Totem Pole Database</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin="">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          crossorigin="anonymous"
+          media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+                   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+                   crossorigin="anonymous"></noscript>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin="" defer></script>
+            crossorigin="anonymous" defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
@@ -527,11 +533,11 @@ function render() {
 let MAP, MARKER_LAYER;
 
 function initMap() {
-    if (typeof L === 'undefined') return;
     MAP = L.map('map', { scrollWheelZoom: false }).setView([47.62, -122.34], 11);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20,
     }).addTo(MAP);
     MARKER_LAYER = L.layerGroup().addTo(MAP);
 }
@@ -613,9 +619,17 @@ function setupLightbox() {
     });
 }
 
+function leafletReady() {
+    if (typeof L !== 'undefined') return Promise.resolve();
+    // Leaflet's <script defer> runs before DOMContentLoaded fires.
+    return new Promise(resolve =>
+        document.addEventListener('DOMContentLoaded', resolve, { once: true })
+    );
+}
+
 async function init() {
     try {
-        const response = await fetch('data.csv');
+        const [response] = await Promise.all([fetch('data.csv'), leafletReady()]);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const text = await response.text();
         DATA = normalizeData(csvToObjects(parseCSV(text)));
