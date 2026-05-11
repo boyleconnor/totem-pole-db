@@ -80,16 +80,6 @@
             margin-bottom: 0.5rem;
             color: #1a3a2a;
         }
-        .card-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem 1.5rem;
-            margin-bottom: 0.8rem;
-            font-size: 0.85rem;
-            color: #555;
-        }
-        .card-meta span { display: inline-flex; align-items: center; gap: 0.3rem; }
-        .card-meta .label { font-weight: 600; color: #333; }
         .badge {
             display: inline-block;
             background: #d4edda;
@@ -98,34 +88,50 @@
             border-radius: 4px;
             font-size: 0.8rem;
             font-weight: 500;
+            margin: 0.05rem 0.15rem 0.05rem 0;
         }
         .badge.non-indigenous {
             background: #fff3cd;
             color: #856404;
         }
-        .section { margin-top: 0.8rem; }
-        .section-title {
-            font-size: 0.8rem;
+        .fields {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+            table-layout: fixed;
+        }
+        .fields th, .fields td {
+            text-align: left;
+            vertical-align: top;
+            padding: 0.5rem 0.6rem;
+            border-bottom: 1px solid #ececec;
+        }
+        .fields tr:last-child th, .fields tr:last-child td { border-bottom: none; }
+        .fields th {
+            width: 7.5rem;
+            font-size: 0.72rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: #888;
-            margin-bottom: 0.3rem;
+            background: #fafaf6;
         }
-        .section-content {
-            font-size: 0.9rem;
+        .fields td {
+            color: #333;
             white-space: pre-wrap;
-            color: #444;
+            word-break: break-word;
+        }
+        .fields .scroll {
             max-height: 200px;
             overflow-y: auto;
         }
-        .links a {
+        .fields td a {
             color: #2d6a4f;
             text-decoration: none;
-            font-size: 0.85rem;
             word-break: break-all;
         }
-        .links a:hover { text-decoration: underline; }
+        .fields td a:hover { text-decoration: underline; }
+        .ref-list { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
         .gallery {
             display: flex;
             gap: 0.5rem;
@@ -171,18 +177,6 @@
             max-height: 100%;
             object-fit: contain;
         }
-        .map-link {
-            display: inline-block;
-            margin-top: 0.4rem;
-            padding: 0.3rem 0.7rem;
-            background: #e8f5e9;
-            border-radius: 4px;
-            color: #2d6a4f;
-            text-decoration: none;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-        .map-link:hover { background: #c8e6c9; }
         footer {
             text-align: center;
             padding: 2rem 1rem;
@@ -315,62 +309,51 @@ function buildAffiliationFilter() {
 }
 
 function renderCard(item) {
-    const links = [...extractLinks(item.notes), ...extractLinks(item.plaque)];
-    const uniqueLinks = [...new Set(links)];
-    const affiliationBadges = item.affiliation
-        ? item.affiliation.split(',').map(a => {
+    const uniqueLinks = [...new Set([...extractLinks(item.notes), ...extractLinks(item.plaque)])];
+    const plaqueText = item.plaque.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
+    const notesText = item.notes.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
+
+    const rows = [];
+    if (item.year) rows.push(['Year', escapeHtml(item.year)]);
+    if (item.artists) rows.push(['Artist(s)', escapeHtml(item.artists)]);
+    if (item.affiliation) {
+        const badges = item.affiliation.split(',').map(a => {
             const t = a.trim();
             if (!t) return '';
             const cls = t.toLowerCase().includes('non-indigenous') ? 'badge non-indigenous' : 'badge';
             return `<span class="${cls}">${escapeHtml(t)}</span>`;
-        }).join(' ')
-        : '';
-
-    let html = `<div class="card">
-        <h2>${escapeHtml(item.name)}</h2>
-        <div class="card-meta">`;
-    if (item.year) html += `<span><span class="label">Year:</span> ${escapeHtml(item.year)}</span>`;
-    if (item.artists) html += `<span><span class="label">Artist(s):</span> ${escapeHtml(item.artists)}</span>`;
-    html += `</div>`;
-    if (affiliationBadges) html += `<div style="margin-bottom:0.6rem">${affiliationBadges}</div>`;
-    if (item.images && item.images.length > 0) {
-        html += `<div class="gallery">`;
-        item.images.forEach(img => {
-            html += `<figure>
-                <img src="${encodeURI(img.src)}" alt="${escapeHtml(item.name)} — ${escapeHtml(img.kind)}" data-full="${encodeURI(img.src)}" loading="lazy">
-                <figcaption>${escapeHtml(img.kind)}</figcaption>
-            </figure>`;
-        });
-        html += `</div>`;
+        }).join('');
+        rows.push(['Affiliation', badges]);
     }
-    if (item.plaque) {
-        const plaqueText = item.plaque.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
-        if (plaqueText) {
-            html += `<div class="section">
-                <div class="section-title">Plaque Transcription</div>
-                <div class="section-content">${escapeHtml(plaqueText)}</div>
-            </div>`;
-        }
-    }
-    if (item.notes) {
-        const notesClean = item.notes.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
-        if (notesClean) {
-            html += `<div class="section">
-                <div class="section-title">Notes</div>
-                <div class="section-content">${escapeHtml(notesClean)}</div>
-            </div>`;
-        }
-    }
+    if (plaqueText) rows.push(['Plaque', `<div class="scroll">${escapeHtml(plaqueText)}</div>`]);
+    if (notesText) rows.push(['Notes', `<div class="scroll">${escapeHtml(notesText)}</div>`]);
     if (uniqueLinks.length > 0) {
-        html += `<div class="section links"><div class="section-title">References</div>`;
-        uniqueLinks.forEach(l => { html += `<a href="${encodeURI(l)}" target="_blank" rel="noopener">${escapeHtml(l)}</a><br>`; });
-        html += `</div>`;
+        const list = uniqueLinks
+            .map(l => `<a href="${encodeURI(l)}" target="_blank" rel="noopener">${escapeHtml(l)}</a>`)
+            .join('');
+        rows.push(['References', `<div class="ref-list">${list}</div>`]);
     }
     if (item.location) {
-        html += `<a class="map-link" href="${encodeURI(item.location)}" target="_blank" rel="noopener">View on Map</a>`;
+        rows.push(['Map', `<a href="${encodeURI(item.location)}" target="_blank" rel="noopener">View on Map</a>`]);
     }
-    html += `</div>`;
-    return html;
+
+    let gallery = '';
+    if (item.images.length > 0) {
+        gallery = `<div class="gallery">` + item.images.map(img => `<figure>
+            <img src="${encodeURI(img.src)}" alt="${escapeHtml(item.name)} — ${escapeHtml(img.kind)}" data-full="${encodeURI(img.src)}" loading="lazy">
+            <figcaption>${escapeHtml(img.kind)}</figcaption>
+        </figure>`).join('') + `</div>`;
+    }
+
+    const tableRows = rows.map(([label, value]) =>
+        `<tr><th>${label}</th><td>${value}</td></tr>`
+    ).join('');
+
+    return `<div class="card">
+        <h2>${escapeHtml(item.name)}</h2>
+        ${gallery}
+        <table class="fields"><tbody>${tableRows}</tbody></table>
+    </div>`;
 }
 
 function render() {
