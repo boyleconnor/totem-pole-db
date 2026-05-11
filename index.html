@@ -132,6 +132,23 @@
         }
         .fields td a:hover { text-decoration: underline; }
         .ref-list { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
+        .map-embed {
+            display: block;
+            width: 100%;
+            height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+        .map-links {
+            font-size: 0.85rem;
+            margin-bottom: 0.25rem;
+        }
+        .map-coords {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.75rem;
+            color: #888;
+        }
         .gallery {
             position: relative;
             margin-bottom: 0.8rem;
@@ -302,10 +319,26 @@ function imageKindFromPath(path) {
     return m ? m[1] : '';
 }
 
+function parseCoords(text) {
+    const m = (text || '').match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    return m ? { lat: parseFloat(m[1]), lon: parseFloat(m[2]) } : null;
+}
+
+function formatDMS(deg, posLabel, negLabel) {
+    const sign = deg < 0 ? negLabel : posLabel;
+    const totalCs = Math.round(Math.abs(deg) * 360000);
+    const cs = totalCs % 100;
+    const sec = Math.floor(totalCs / 100) % 60;
+    const min = Math.floor(totalCs / 6000) % 60;
+    const d = Math.floor(totalCs / 360000);
+    const secStr = (sec + cs / 100).toFixed(2);
+    return `${d}°${min}′${secStr}″ ${sign}`;
+}
+
 function normalizeData(raw) {
     return raw.map(r => ({
         name: r.name || '',
-        location: r.location || '',
+        coords: parseCoords(r.location),
         plaque: r.plaque || '',
         year: r.year || '',
         artists: (r.artists || '').replace(/\n/g, ', '),
@@ -369,8 +402,23 @@ function renderCard(item) {
             .join('');
         rows.push(['References', `<div class="ref-list">${list}</div>`]);
     }
-    if (item.location) {
-        rows.push(['Map', `<a href="${encodeURI(item.location)}" target="_blank" rel="noopener">View on Map</a>`]);
+    if (item.coords) {
+        const { lat, lon } = item.coords;
+        const q = encodeURIComponent(item.name);
+        const providers = [
+            ['Google', `https://www.google.com/maps?q=${lat},${lon}`],
+            ['Apple', `https://maps.apple.com/?ll=${lat},${lon}&q=${q}`],
+            ['OpenStreetMap', `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`],
+            ['Bing', `https://www.bing.com/maps?cp=${lat}~${lon}&lvl=18`],
+        ];
+        const links = providers
+            .map(([label, url]) => `<a href="${url}" target="_blank" rel="noopener">${label}</a>`)
+            .join(' · ');
+        const d = 0.0015;
+        const bbox = `${lon - d},${lat - d},${lon + d},${lat + d}`;
+        const embed = `<iframe class="map-embed" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}" title="Map of ${escapeHtml(item.name)}"></iframe>`;
+        const coordsText = `${formatDMS(lat, 'N', 'S')}, ${formatDMS(lon, 'E', 'W')}`;
+        rows.push(['Map', `${embed}<div class="map-links">${links}</div><div class="map-coords">${coordsText}</div>`]);
     }
 
     let gallery = '';
