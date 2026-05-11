@@ -158,16 +158,21 @@
         }
         .gallery .stage {
             display: flex;
-            align-items: center;
-            justify-content: center;
             min-height: 320px;
+            transition: transform 0.35s ease;
+            will-change: transform;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .gallery .stage { transition: none; }
         }
         .gallery .slide {
-            display: none;
+            flex: 0 0 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin: 0;
             padding: 0.75rem;
         }
-        .gallery .slide.active { display: block; }
         .gallery .slide img {
             display: block;
             max-width: 100%;
@@ -197,6 +202,7 @@
             transition: background 0.15s;
         }
         .gallery .nav:hover { background: rgba(0,0,0,0.7); }
+        .gallery .nav:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
         .gallery .nav-prev { left: 0.5rem; }
         .gallery .nav-next { right: 0.5rem; }
         .gallery .caption {
@@ -423,11 +429,11 @@ function renderCard(item) {
 
     let gallery = '';
     if (item.images.length > 0) {
-        const slides = item.images.map((img, i) => `<figure class="slide${i === 0 ? ' active' : ''}" data-kind="${escapeHtml(img.kind)}">
+        const slides = item.images.map(img => `<figure class="slide" data-kind="${escapeHtml(img.kind)}">
             <img src="${encodeURI(img.src)}" alt="${escapeHtml(item.name)} — ${escapeHtml(img.kind)}" data-full="${encodeURI(img.src)}" loading="lazy">
         </figure>`).join('');
         const nav = item.images.length > 1
-            ? `<button class="nav nav-prev" aria-label="Previous image">‹</button>
+            ? `<button class="nav nav-prev" aria-label="Previous image" disabled>‹</button>
                <button class="nav nav-next" aria-label="Next image">›</button>`
             : '';
         const firstKind = item.images[0].kind;
@@ -467,15 +473,19 @@ function navigateGallery(gallery, delta) {
     const count = parseInt(gallery.dataset.count, 10);
     if (count <= 1) return;
     const current = parseInt(gallery.dataset.index, 10);
-    const next = (current + delta + count) % count;
+    const next = Math.max(0, Math.min(count - 1, current + delta));
+    if (next === current) return;
     gallery.dataset.index = next;
-    const slides = gallery.querySelectorAll('.slide');
-    slides.forEach((s, i) => s.classList.toggle('active', i === next));
+    gallery.querySelector('.stage').style.transform = `translateX(-${next * 100}%)`;
     const caption = gallery.querySelector('.caption');
     if (caption) {
-        const kind = slides[next].dataset.kind || '';
+        const kind = gallery.querySelectorAll('.slide')[next].dataset.kind || '';
         caption.textContent = `${kind} · ${next + 1} / ${count}`;
     }
+    const prev = gallery.querySelector('.nav-prev');
+    const nxt = gallery.querySelector('.nav-next');
+    if (prev) prev.disabled = next === 0;
+    if (nxt) nxt.disabled = next === count - 1;
 }
 
 function setupLightbox() {
