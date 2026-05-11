@@ -341,6 +341,15 @@ function formatDMS(deg, posLabel, negLabel) {
     return `${d}°${min}′${secStr}″ ${sign}`;
 }
 
+function parseReferences(text) {
+    if (!text) return [];
+    return text.split('\n').map(line => {
+        const tab = line.indexOf('\t');
+        if (tab < 0) return { title: line, url: line };
+        return { title: line.slice(0, tab), url: line.slice(tab + 1) };
+    }).filter(ref => ref.url);
+}
+
 function normalizeData(raw) {
     return raw.map(r => ({
         name: r.name || '',
@@ -350,15 +359,11 @@ function normalizeData(raw) {
         artists: (r.artists || '').replace(/\n/g, ', '),
         affiliation: (r.affiliation || '').replace(/\n/g, ', '),
         notes: r.notes || '',
+        references: parseReferences(r.references),
         images: r.images
             ? r.images.split('|').filter(Boolean).map(src => ({ kind: imageKindFromPath(src), src }))
             : []
     }));
-}
-
-function extractLinks(text) {
-    const urlRegex = /https?:\/\/[^\s"<>)]+/g;
-    return text ? (text.match(urlRegex) || []) : [];
 }
 
 function escapeHtml(text) {
@@ -384,9 +389,8 @@ function buildAffiliationFilter() {
 }
 
 function renderCard(item) {
-    const uniqueLinks = [...new Set([...extractLinks(item.notes), ...extractLinks(item.plaque)])];
-    const plaqueText = item.plaque.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
-    const notesText = item.notes.replace(/https?:\/\/[^\s"<>)]+/g, '').trim();
+    const plaqueText = item.plaque.trim();
+    const notesText = item.notes.trim();
 
     const rows = [];
     if (item.year) rows.push(['Year', escapeHtml(item.year)]);
@@ -402,9 +406,9 @@ function renderCard(item) {
     }
     if (plaqueText) rows.push(['Plaque', `<div class="scroll">${escapeHtml(plaqueText)}</div>`]);
     if (notesText) rows.push(['Notes', `<div class="scroll">${escapeHtml(notesText)}</div>`]);
-    if (uniqueLinks.length > 0) {
-        const list = uniqueLinks
-            .map(l => `<a href="${encodeURI(l)}" target="_blank" rel="noopener">${escapeHtml(l)}</a>`)
+    if (item.references.length > 0) {
+        const list = item.references
+            .map(ref => `<a href="${encodeURI(ref.url)}" target="_blank" rel="noopener">${escapeHtml(ref.title)}</a>`)
             .join('');
         rows.push(['References', `<div class="ref-list">${list}</div>`]);
     }
