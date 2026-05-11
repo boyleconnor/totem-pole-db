@@ -133,32 +133,68 @@
         .fields td a:hover { text-decoration: underline; }
         .ref-list { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
         .gallery {
-            display: flex;
-            gap: 0.5rem;
+            position: relative;
             margin-bottom: 0.8rem;
-            flex-wrap: wrap;
+            background: #f0ede5;
+            border-radius: 6px;
+            overflow: hidden;
         }
-        .gallery figure {
-            margin: 0;
+        .gallery .stage {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 0.25rem;
+            justify-content: center;
+            min-height: 320px;
         }
-        .gallery img {
-            width: 110px;
-            height: 140px;
-            object-fit: cover;
-            border-radius: 4px;
-            background: #eee;
-            cursor: zoom-in;
+        .gallery .slide {
+            display: none;
+            margin: 0;
+            padding: 0.75rem;
+        }
+        .gallery .slide.active { display: block; }
+        .gallery .slide img {
             display: block;
+            max-width: 100%;
+            max-height: 460px;
+            object-fit: contain;
+            cursor: zoom-in;
+            margin: 0 auto;
         }
-        .gallery figcaption {
+        .gallery .nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.45);
+            color: white;
+            border: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            padding: 0;
+            transition: background 0.15s;
+        }
+        .gallery .nav:hover { background: rgba(0,0,0,0.7); }
+        .gallery .nav-prev { left: 0.5rem; }
+        .gallery .nav-next { right: 0.5rem; }
+        .gallery .caption {
+            position: absolute;
+            bottom: 0.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.55);
+            color: white;
             font-size: 0.7rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #888;
+            letter-spacing: 0.06em;
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            pointer-events: none;
         }
         .lightbox {
             position: fixed;
@@ -339,10 +375,20 @@ function renderCard(item) {
 
     let gallery = '';
     if (item.images.length > 0) {
-        gallery = `<div class="gallery">` + item.images.map(img => `<figure>
+        const slides = item.images.map((img, i) => `<figure class="slide${i === 0 ? ' active' : ''}" data-kind="${escapeHtml(img.kind)}">
             <img src="${encodeURI(img.src)}" alt="${escapeHtml(item.name)} — ${escapeHtml(img.kind)}" data-full="${encodeURI(img.src)}" loading="lazy">
-            <figcaption>${escapeHtml(img.kind)}</figcaption>
-        </figure>`).join('') + `</div>`;
+        </figure>`).join('');
+        const nav = item.images.length > 1
+            ? `<button class="nav nav-prev" aria-label="Previous image">‹</button>
+               <button class="nav nav-next" aria-label="Next image">›</button>`
+            : '';
+        const firstKind = item.images[0].kind;
+        const caption = `<div class="caption">${escapeHtml(firstKind)}${item.images.length > 1 ? ` · 1 / ${item.images.length}` : ''}</div>`;
+        gallery = `<div class="gallery" data-index="0" data-count="${item.images.length}">
+            <div class="stage">${slides}</div>
+            ${nav}
+            ${caption}
+        </div>`;
     }
 
     const tableRows = rows.map(([label, value]) =>
@@ -369,10 +415,30 @@ function render() {
     document.getElementById('grid').innerHTML = filtered.map(renderCard).join('');
 }
 
+function navigateGallery(gallery, delta) {
+    const count = parseInt(gallery.dataset.count, 10);
+    if (count <= 1) return;
+    const current = parseInt(gallery.dataset.index, 10);
+    const next = (current + delta + count) % count;
+    gallery.dataset.index = next;
+    const slides = gallery.querySelectorAll('.slide');
+    slides.forEach((s, i) => s.classList.toggle('active', i === next));
+    const caption = gallery.querySelector('.caption');
+    if (caption) {
+        const kind = slides[next].dataset.kind || '';
+        caption.textContent = `${kind} · ${next + 1} / ${count}`;
+    }
+}
+
 function setupLightbox() {
     const lb = document.getElementById('lightbox');
     const lbImg = document.getElementById('lightbox-img');
     document.getElementById('grid').addEventListener('click', e => {
+        const nav = e.target.closest('.gallery .nav');
+        if (nav) {
+            navigateGallery(nav.closest('.gallery'), nav.classList.contains('nav-next') ? 1 : -1);
+            return;
+        }
         const img = e.target.closest('.gallery img');
         if (!img) return;
         lbImg.src = img.dataset.full || img.src;
