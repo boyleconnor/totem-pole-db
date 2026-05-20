@@ -31,8 +31,79 @@
             padding: 2rem 1rem;
             text-align: center;
         }
-        header h1 { font-size: 1.8rem; margin-bottom: 0.3rem; }
+        header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.3rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
         header p { opacity: 0.8; font-size: 0.95rem; }
+        .info-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 1px solid rgba(232, 228, 216, 0.5);
+            background: transparent;
+            color: #e8e4d8;
+            font-family: Georgia, "Times New Roman", serif;
+            font-style: italic;
+            font-size: 0.85rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            vertical-align: middle;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .info-btn:hover, .info-btn:focus {
+            background: rgba(232, 228, 216, 0.15);
+            border-color: #e8e4d8;
+            outline: none;
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 1rem;
+        }
+        .modal.open { display: flex; }
+        .modal-content {
+            background: white;
+            color: #2c2c2c;
+            border-radius: 8px;
+            max-width: 460px;
+            width: 100%;
+            padding: 1.75rem 1.75rem 1.5rem;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .modal-content h2 {
+            font-size: 1.15rem;
+            color: #1a3a2a;
+            margin-bottom: 0.75rem;
+        }
+        .modal-content p { font-size: 0.95rem; margin-bottom: 0.75rem; }
+        .modal-content p:last-child { margin-bottom: 0; }
+        .modal-content a { color: #2d6a4f; }
+        .modal-close {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            color: #888;
+            font-size: 1.4rem;
+            line-height: 1;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .modal-close:hover { background: #f0f0f0; color: #333; }
         .controls {
             max-width: 1100px;
             margin: 1.5rem auto;
@@ -299,9 +370,24 @@
 </head>
 <body>
     <header>
-        <h1>Seattle Totem Pole Database</h1>
-        <p>A catalog of totem poles and carved poles in the Seattle area</p>
+        <h1>Seattle Carved Pole Database <button class="info-btn" id="info-btn" aria-label="About this site" aria-haspopup="dialog">i</button></h1>
+        <p>A catalog of totem poles and other carved poles in the Seattle area</p>
     </header>
+    <div id="info-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="info-modal-title">
+        <div class="modal-content">
+            <button class="modal-close" id="info-modal-close" aria-label="Close">×</button>
+            <h2 id="info-modal-title">About</h2>
+            <p>Totem poles are an art-form of several indigenous peoples of the Pacific Northwest Coast. This web page
+                is an in-progress collection of the totem poles and other similar carved poles that have been erected
+                within the city limits of Seattle at some point of their existence.
+            </p><p>The data and photographs on
+                this web page were collected by me, <a href="https://connorboyle.io" target="_blank" rel="noopener">Connor
+                Boyle</a>. I created the user interface using an AI-assisted coding tool. Any constructive contributions
+                to the data or interface are welcome as issues or pull requests at the
+                <a href="https://github.com/boyleconnor/totem-pole-db">GitHub repository</a> for this web page.
+            </p>
+        </div>
+    </div>
     <div class="controls">
         <input type="text" id="search" placeholder="Search by name, artist, affiliation...">
         <select id="filter-affiliation">
@@ -593,6 +679,18 @@ function navigateGallery(gallery, delta) {
     if (nxt) nxt.disabled = next === count - 1;
 }
 
+function setupInfoModal() {
+    const modal = document.getElementById('info-modal');
+    const open = () => modal.classList.add('open');
+    const close = () => modal.classList.remove('open');
+    document.getElementById('info-btn').addEventListener('click', open);
+    document.getElementById('info-modal-close').addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && modal.classList.contains('open')) close();
+    });
+}
+
 function setupLightbox() {
     const lb = document.getElementById('lightbox');
     const lbImg = document.getElementById('lightbox-img');
@@ -649,6 +747,7 @@ async function init() {
     }
 }
 
+setupInfoModal();
 init();
 </script>
 </body>
